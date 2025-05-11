@@ -1,14 +1,19 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { Accelerometer } from 'expo-sensors';
 import { bundleResourceIO } from '@tensorflow/tfjs-react-native';
 import * as tf from '@tensorflow/tfjs';
+import { useContext } from 'react';
+import { ActivityContext } from '../context/ActivityContext';
+
 
 export default function WalkingScreen({ navigation }) {
     const [duration, setDuration] = useState(0);
     const [isWalking, setIsWalking] = useState(false);
     const [windowData, setWindowData] = useState([]);
     const [predictedClass, setPredictedClass] = useState(null);
+    const { updateActivityTime } = useContext(ActivityContext);
 
     const durationRef = useRef(0);
     const isWalkingRef = useRef(false);
@@ -92,6 +97,7 @@ export default function WalkingScreen({ navigation }) {
                 accelSubscriptionRef.current.remove();
             }
             clearInterval(intervalRef.current);
+            updateActivityTime('walking', durationRef.current);
         };
     }, []);
 

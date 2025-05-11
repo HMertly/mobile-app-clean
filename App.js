@@ -3,6 +3,10 @@ import { View, StyleSheet, Image, TouchableOpacity, Text, Alert, Vibration } fro
 import { Audio } from 'expo-av'; // Ses oynatma için gerekli
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import * as Notifications from 'expo-notifications';
+import { registerForPushNotificationsAsync } from './utils/NotificationService';
+import { ActivityProvider } from './context/ActivityContext';
+
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Gyroscope, Accelerometer } from 'expo-sensors';
@@ -13,7 +17,11 @@ import RegisterScreen from './screens/RegisterScreen';
 import GoogleFitScreen from './screens/googleFitScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import WalkingScreen from './screens/WalkingScreen';
-
+import StairScreen from './screens/StairScreen';
+import RunningScreen from './screens/RunningScreen';
+import ProfileScreen from './screens/ProfileScreen';
+//EcLCmGOLcsYeWmYz
+//85.153.227.31
 
 
 
@@ -168,9 +176,18 @@ function NewScreen({ navigation }) {
             <Image source={require('./assets/Group 71.png')} style={styles.group71Image} resizeMode="contain" />
             <Image source={require('./assets/Cycling.png')} style={styles.cyclingImage} resizeMode="contain" />
             <Image source={require('./assets/Component1 – 1.png')} style={styles.component1Image} resizeMode="contain" />
+            {/* ✅ Upstairs Card */}
+            <Image source={require('./assets/Component 4 – 1.png')} style={styles.upstairsCardImage} resizeMode="contain" />
+            <Image source={require('./assets/upstairs.png')} style={styles.upstairsIconImage} resizeMode="contain" />
+            <TouchableOpacity onPress={() => navigation.navigate('StairScreen')} style={styles.showUpstairsButton}>
+                <Image source={require('./assets/Group79.png')} style={styles.showUpstairsImage} resizeMode="contain" />
+            </TouchableOpacity>
+
+
             <Image source={require('./assets/Walking.png')} style={styles.walkingImage} resizeMode="contain" />
 
-            <TouchableOpacity onPress={() => alert('Sonuçlar Gösteriliyor!')} style={styles.showResultsButton}>
+
+            <TouchableOpacity onPress={() => navigation.navigate('RunningScreen')} style={styles.showResultsButton}>
                 <Image source={require('./assets/Group79.png')} style={styles.showResultsImage} resizeMode="contain" />
             </TouchableOpacity>
 
@@ -185,9 +202,10 @@ function NewScreen({ navigation }) {
             <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconButton, styles.buttonHome]}>
                 <Image source={require('./assets/Path19.png')} style={styles.iconImage} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => alert('Profile Butonu')} style={[styles.iconButton, styles.buttonProfile]}>
+            <TouchableOpacity onPress={() => navigation.navigate('ProfileScreen')} style={[styles.iconButton, styles.buttonProfile]}>
                 <Image source={require('./assets/Group60.png')} style={styles.iconImage} />
             </TouchableOpacity>
+
             <TouchableOpacity onPress={() => navigation.navigate('SettingsScreen')} style={[styles.iconButton, styles.buttonSettings]}>
                 <Image source={require('./assets/Group62.png')} style={styles.iconImage} />
             </TouchableOpacity>
@@ -198,28 +216,54 @@ function NewScreen({ navigation }) {
 
 export default function App() {
     useEffect(() => {
-        const stopGlobalListener = startGlobalSensorListener();
-        return stopGlobalListener;
+        const init = async () => {
+            const token = await registerForPushNotificationsAsync();
+            if (token) {
+                console.log("🟢 Expo Push Token:", token);
+
+                await fetch("https://mobile-app-backend-1jqt.onrender.com/api/notifications/register-token", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ token })
+                });
+            }
+        };
+
+        init();
+
+        const stop = startGlobalSensorListener();
+
+        const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+            console.log("🔔 Bildirim geldi:", notification);
+        });
+
+        return () => {
+            stop();
+            notificationListener.remove();
+        };
     }, []);
 
     return (
-        <NavigationContainer>
-            <Stack.Navigator initialRouteName="LoginScreen">
-                <Stack.Screen name="LoginScreen" component={LoginScreen} options={{ headerShown: false }} />
-                <Stack.Screen name="RegisterScreen" component={RegisterScreen} options={{ headerShown: false }} />
-                <Stack.Screen name="HomeScreen" component={HomeScreen} options={{ headerShown: false }} />
-                <Stack.Screen name="NewScreen" component={NewScreen} options={{ headerShown: false }} />
-                <Stack.Screen name="SettingsScreen" component={SettingsScreen} options={{ title: 'Konum Ekranı' }} />
-                <Stack.Screen
-                    name="WalkingScreen"
-                    component={WalkingScreen} // WalkingScreen burada tanımlı.
-                    options={{ title: 'Walking Screen' }}
-                />
-                <Stack.Screen name="GoogleFitScreen" component={GoogleFitScreen} />
-
-            </Stack.Navigator>
-        </NavigationContainer>
+        <ActivityProvider>
+            <NavigationContainer>
+                <Stack.Navigator initialRouteName="LoginScreen">
+                    <Stack.Screen name="LoginScreen" component={LoginScreen} options={{ headerShown: false }} />
+                    <Stack.Screen name="RegisterScreen" component={RegisterScreen} options={{ headerShown: false }} />
+                    <Stack.Screen name="HomeScreen" component={HomeScreen} options={{ headerShown: false }} />
+                    <Stack.Screen name="NewScreen" component={NewScreen} options={{ headerShown: false }} />
+                    <Stack.Screen name="StairScreen" component={StairScreen} options={{ title: 'Stair Screen' }} />
+                    <Stack.Screen name="RunningScreen" component={RunningScreen} options={{ title: 'Running Screen' }} />
+                    <Stack.Screen name="SettingsScreen" component={SettingsScreen} options={{ title: 'Konum Ekranı' }} />
+                    <Stack.Screen name="WalkingScreen" component={WalkingScreen} options={{ title: 'Walking Screen' }} />
+                    <Stack.Screen name="GoogleFitScreen" component={GoogleFitScreen} />
+                    <Stack.Screen name="ProfileScreen" component={require('./screens/ProfileScreen').default} options={{ title: 'Profilim' }} />
+                </Stack.Navigator>
+            </NavigationContainer>
+        </ActivityProvider>
     );
+
 }
 
 
@@ -276,4 +320,33 @@ const styles = StyleSheet.create({
     coordinateText: { fontSize: moderateScale(16), fontWeight: '500', color: '#333' },
     loadingText: { fontSize: moderateScale(16), fontWeight: 'bold', color: '#888' },
     map: { width: wp('90%'), height: hp('40%'), borderRadius: 10 },
+
+    upstairsCardImage: {
+        width: wp('90%'),
+        height: hp('45%'),
+        position: 'absolute',
+        bottom: hp('52%'),
+        left: wp('5%'),
+    },
+    upstairsIconImage: {
+        width: wp('40%'),
+        height: hp('25%'),
+        position: 'absolute',
+        bottom: hp('62%'),
+        left: wp('52%'),
+    },
+    showUpstairsButton: {
+        position: 'absolute',
+        bottom: hp('68.5%'),
+        left: wp('9%'),
+        width: wp('30%'),
+        height: hp('5%'),
+        zIndex: 10,
+    },
+    showUpstairsImage: {
+        width: '100%',
+        height: '100%',
+    },
+
+
 });

@@ -10,7 +10,8 @@ module.exports = (() => {
 
     config.resolver = {
         ...config.resolver,
-        assetExts: [...config.resolver.assetExts.filter((ext) => ext !== 'svg'), 'bin'],
+        assetExts: [...config.resolver.assetExts.filter((ext) => ext !== 'svg'), 'bin', 'json'],
+
         sourceExts: [...config.resolver.sourceExts, 'svg'],
     };
 

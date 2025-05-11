@@ -21,8 +21,14 @@
         },
         "NSLocationWhenInUseUsageDescription": "Uygulama konumunuzu kullanarak size daha iyi bir deneyim sunar.",
         "NSUserTrackingUsageDescription": "Bildirim göndermek için izniniz gereklidir.",
-        "UIBackgroundModes": ["remote-notification", "fetch"]
-      }
+        "UIBackgroundModes": [
+          "remote-notification",
+          "fetch",
+          "remote-notification",
+          "fetch"
+        ]
+      },
+      "bundleIdentifier": "com.anonymous.MyProject"
     },
     "android": {
       "adaptiveIcon": {
@@ -43,12 +49,15 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
-          "color": "#ffffff",
-          "sounds": ["./assets/sound1.wav", "./assets/sound2.wav"]
+          "color": "#ffffff"
         }
       ],
       "expo-sqlite"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "00000000-0000-0000-0000-000000000000"
+      }
+    }
   }
 }
