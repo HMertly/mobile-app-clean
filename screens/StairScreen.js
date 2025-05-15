@@ -1,109 +1,144 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useContext } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
-import { Accelerometer } from 'expo-sensors';
-import { bundleResourceIO } from '@tensorflow/tfjs-react-native';
-import * as tf from '@tensorflow/tfjs';
-import { useContext } from 'react';
+import { Gyroscope, Accelerometer } from 'expo-sensors';
+import { fft } from 'fft-js';
+import axios from 'axios';
 import { ActivityContext } from '../context/ActivityContext';
-
 
 export default function StairScreen({ navigation }) {
     const [duration, setDuration] = useState(0);
-    const [isClimbing, setIsClimbing] = useState(false);
-    const [windowData, setWindowData] = useState([]);
     const [predictedClass, setPredictedClass] = useState(null);
     const { updateActivityTime } = useContext(ActivityContext);
+
     const durationRef = useRef(0);
     const isClimbingRef = useRef(false);
-    const modelRef = useRef(null);
+    const accelData = useRef([]);
+    const gyroData = useRef([]);
+    const accelSub = useRef(null);
+    const gyroSub = useRef(null);
+    const predictionTimer = useRef(null);
     const intervalRef = useRef(null);
-    const accelSubscriptionRef = useRef(null);
 
-    useEffect(() => {
-        const loadModel = async () => {
-            try {
-                await tf.ready();
-                console.log("✅ TensorFlow hazır (StairScreen)");
+    const SAMPLE_SIZE = 128;
 
-                const modelJson = require('../assets/tfjs_model/model.json');
-                const modelWeights = [require('../assets/tfjs_model/group1-shard1of1.bin')];
+    const extractFeatures = (data) => {
+        const channels = [[], [], [], [], [], []]; // ax, ay, az, gx, gy, gz
 
-                const model = await tf.loadLayersModel(bundleResourceIO(modelJson, modelWeights));
-                modelRef.current = model;
+        data.forEach(([ax, ay, az, gx, gy, gz]) => {
+            channels[0].push(ax);
+            channels[1].push(ay);
+            channels[2].push(az);
+            channels[3].push(gx);
+            channels[4].push(gy);
+            channels[5].push(gz);
+        });
 
-                console.log("✅ Model başarıyla yüklendi (StairScreen)");
-            } catch (error) {
-                console.error("🛑 Model yükleme hatası (StairScreen):", error);
-                Alert.alert("Model yüklenemedi", "Model dosyalarının doğru yüklendiğinden emin olun.");
-            }
+        const features = [];
+
+        const stats = (arr) => {
+            const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+            const std = Math.sqrt(arr.map(x => (x - mean) ** 2).reduce((a, b) => a + b, 0) / arr.length);
+            const min = Math.min(...arr);
+            const max = Math.max(...arr);
+            return [mean, std, min, max];
         };
 
-        const predictLocally = async (featureArray) => {
-            try {
-                if (!modelRef.current || featureArray.length !== 240) return;
-
-                const reshaped = [];
-                for (let i = 0; i < featureArray.length; i += 3) {
-                    reshaped.push(featureArray.slice(i, i + 3));
-                }
-
-                const inputTensor = tf.tensor3d([reshaped], [1, 80, 3]);
-                const prediction = modelRef.current.predict(inputTensor);
-                const predicted = prediction.argMax(-1).dataSync()[0];
-
-                console.log("🔍 Tahmin sonucu (StairScreen):", predicted);
-                setPredictedClass(predicted);
-
-                const climbing = predicted === 4;
-                setIsClimbing(climbing);
-                isClimbingRef.current = climbing;
-            } catch (err) {
-                console.error("🛑 Tahmin hatası (StairScreen):", err);
-            }
+        const fftPeak = (arr) => {
+            const phasors = fft(arr);
+            const magnitudes = phasors.map(p => Math.sqrt(p[0] ** 2 + p[1] ** 2));
+            return Math.max(...magnitudes);
         };
 
-        const startTracking = () => {
-            Accelerometer.setUpdateInterval(100);
+        const fftPower = (arr) => {
+            const phasors = fft(arr);
+            return phasors.map(([re, im]) => re ** 2 + im ** 2).reduce((a, b) => a + b, 0);
+        };
 
-            accelSubscriptionRef.current = Accelerometer.addListener(({ x, y, z }) => {
-                setWindowData(prev => {
-                    const updated = [...prev, x, y, z];
-                    if (updated.length >= 240) {
-                        predictLocally(updated.slice(-240));
-                    }
-                    return updated.slice(-240);
-                });
+        const entropy = (arr) => {
+            const total = arr.reduce((a, b) => a + Math.abs(b), 0);
+            return -arr.map(x => Math.abs(x) / total).filter(p => p > 0).map(p => p * Math.log2(p)).reduce((a, b) => a + b, 0);
+        };
+
+        channels.forEach((channel) => {
+            features.push(...stats(channel));
+            features.push(fftPeak(channel));
+            features.push(fftPower(channel));
+            features.push(entropy(channel));
+        });
+
+        while (features.length < 562) {
+            features.push(0);
+        }
+
+        return features.slice(0, 562);
+    };
+
+    const predictViaAPI = async (featureArray) => {
+        try {
+            const response = await axios.post("https://mobile-flask-api.onrender.com/predict", {
+                features: featureArray
             });
 
-            intervalRef.current = setInterval(() => {
-                if (isClimbingRef.current) {
-                    durationRef.current += 1;
-                    setDuration(durationRef.current);
-                }
-            }, 1000);
-        };
+            const prediction = response.data.prediction;
+            setPredictedClass(prediction);
+            isClimbingRef.current = prediction === 5; // 5 = WALKING_UPSTAIRS
+        } catch (error) {
+            console.error("🛑 API tahmin hatası:", error.message);
+            Alert.alert("API hatası", "Sunucuya erişilemiyor.");
+        }
+    };
 
-        const prepare = async () => {
-            await loadModel();
-            startTracking();
-        };
+    const startSensors = () => {
+        Accelerometer.setUpdateInterval(20);
+        Gyroscope.setUpdateInterval(20);
 
-        prepare();
+        accelSub.current = Accelerometer.addListener(data => {
+            accelData.current.push([data.x, data.y, data.z]);
+            if (accelData.current.length > SAMPLE_SIZE) accelData.current.shift();
+        });
+
+        gyroSub.current = Gyroscope.addListener(data => {
+            gyroData.current.push([data.x, data.y, data.z]);
+            if (gyroData.current.length > SAMPLE_SIZE) gyroData.current.shift();
+        });
+
+        predictionTimer.current = setInterval(() => {
+            const combined = accelData.current.map((accel, i) => {
+                const gyro = gyroData.current[i] || [0, 0, 0];
+                return [...accel, ...gyro];
+            });
+
+            if (combined.length === SAMPLE_SIZE) {
+                const features = extractFeatures(combined);
+                predictViaAPI(features);
+            }
+        }, 1000);
+
+        intervalRef.current = setInterval(() => {
+            if (isClimbingRef.current) {
+                durationRef.current += 1;
+                setDuration(durationRef.current);
+            }
+        }, 1000);
+    };
+
+    useEffect(() => {
+        startSensors();
 
         return () => {
-            if (accelSubscriptionRef.current) {
-                accelSubscriptionRef.current.remove();
-            }
+            accelSub.current?.remove();
+            gyroSub.current?.remove();
             clearInterval(intervalRef.current);
+            clearInterval(predictionTimer.current);
             updateActivityTime('upstairs', durationRef.current);
         };
     }, []);
 
     const handleGoBack = () => {
-        if (accelSubscriptionRef.current) {
-            accelSubscriptionRef.current.remove();
-        }
+        accelSub.current?.remove();
+        gyroSub.current?.remove();
         clearInterval(intervalRef.current);
+        clearInterval(predictionTimer.current);
         navigation.navigate('NewScreen');
     };
 
@@ -118,7 +153,6 @@ export default function StairScreen({ navigation }) {
             <Text style={styles.title}>Merdiven Çıkma Süresi</Text>
             <Text style={styles.duration}>{formatTime(duration)}</Text>
             <Text style={styles.prediction}>Tahmin edilen sınıf: {predictedClass !== null ? predictedClass : "..."}</Text>
-
             <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
                 <Text style={styles.backText}>🔙 Geri Dön</Text>
             </TouchableOpacity>
@@ -138,8 +172,5 @@ const styles = StyleSheet.create({
         backgroundColor: '#eee',
         borderRadius: 8,
     },
-    backText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-    }
+    backText: { fontSize: 16, fontWeight: 'bold' }
 });

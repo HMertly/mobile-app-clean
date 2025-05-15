@@ -15,6 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.deha.activitytracker",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -23,12 +24,9 @@
         "NSUserTrackingUsageDescription": "Bildirim göndermek için izniniz gereklidir.",
         "UIBackgroundModes": [
           "remote-notification",
-          "fetch",
-          "remote-notification",
           "fetch"
         ]
-      },
-      "bundleIdentifier": "com.anonymous.MyProject"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -40,7 +38,7 @@
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE"
       ],
-      "package": "com.anonymous.MyProject"
+      "package": "com.deha.activitytracker"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -54,6 +52,7 @@
       ],
       "expo-sqlite"
     ],
+
     "extra": {
       "eas": {
         "projectId": "00000000-0000-0000-0000-000000000000"

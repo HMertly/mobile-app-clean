@@ -1,4 +1,51 @@
-echo "node_modules/
+# Node modules
+node_modules/
+
+# Expo build outputs
 .expo/
+.expo-shared/
+
+# iOS & Android build
+android/
+ios/
+*.apk
+*.aab
+
+# OS-specific
 .DS_Store
-.idea/" > .gitignore
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Python virtual environments
+.venv/
+env/
+ENV/
+
+# Python artifacts
+*.pyc
+*.pyo
+__pycache__/
+*.sqlite3
+
+# Local environment
+.env
+.env.local
+.env.development
+.env.production
+
+# Logs
+*.log
+
+# Test outputs
+coverage/
+jest-coverage/
+
+# EAS build artifacts
+dist/
+build/
+
+# MacOS quarantine file
+*.quarantine
