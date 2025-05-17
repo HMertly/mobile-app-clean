@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, Text, Alert, Vibration } from 'react-native';
 import { Audio } from 'expo-av'; // Ses oynatma için gerekli
@@ -19,6 +20,7 @@ import SettingsScreen from './screens/SettingsScreen';
 import WalkingScreen from './screens/WalkingScreen';
 import StairScreen from './screens/StairScreen';
 import RunningScreen from './screens/RunningScreen';
+import CyclingScreen from './screens/CyclingScreen';
 import ProfileScreen from './screens/ProfileScreen';
 //EcLCmGOLcsYeWmYz
 //85.153.227.31
@@ -195,7 +197,7 @@ function NewScreen({ navigation }) {
                 <Image source={require('./assets/Group73.png')} style={styles.showWalkingImage} resizeMode="contain" />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => alert('Cycling Gösteriliyor!')} style={styles.showCyclingButton}>
+            <TouchableOpacity onPress={()=> navigation.navigate('CyclingScreen')} style={styles.showCyclingButton}>
                 <Image source={require('./assets/Group64.png')} style={styles.showCyclingImage} resizeMode="contain" />
             </TouchableOpacity>
 
@@ -253,6 +255,7 @@ export default function App() {
                     <Stack.Screen name="RegisterScreen" component={RegisterScreen} options={{ headerShown: false }} />
                     <Stack.Screen name="HomeScreen" component={HomeScreen} options={{ headerShown: false }} />
                     <Stack.Screen name="NewScreen" component={NewScreen} options={{ headerShown: false }} />
+                    <Stack.Screen name="CyclingScreen" component={CyclingScreen} options={{ title: 'Cycling Analysis' }} />
                     <Stack.Screen name="StairScreen" component={StairScreen} options={{ title: 'Stair Screen' }} />
                     <Stack.Screen name="RunningScreen" component={RunningScreen} options={{ title: 'Running Screen' }} />
                     <Stack.Screen name="SettingsScreen" component={SettingsScreen} options={{ title: 'Konum Ekranı' }} />

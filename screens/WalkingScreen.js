@@ -20,6 +20,30 @@ export default function WalkingScreen({ navigation }) {
     const intervalRef = useRef(null);
 
     const SAMPLE_SIZE = 128;
+    const backendUrl = "https://mobile-flask-api.onrender.com";
+
+    const waitUntilBackendIsReady = async () => {
+        let attempts = 0;
+        const maxAttempts = 10;
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        while (attempts < maxAttempts) {
+            try {
+                const response = await fetch(`${backendUrl}/`);
+                if (response.ok) {
+                    console.log("✅ Backend hazır!");
+                    return;
+                }
+            } catch (err) {
+                console.log("⏳ Backend uyanıyor...");
+            }
+
+            attempts++;
+            await delay(3000); // 3 saniye bekle
+        }
+
+        throw new Error("❌ Backend yanıt vermiyor.");
+    };
 
     const extractFeatures = (data) => {
         const channels = [[], [], [], [], [], []]; // ax, ay, az, gx, gy, gz
@@ -75,7 +99,9 @@ export default function WalkingScreen({ navigation }) {
 
     const predictViaAPI = async (featureArray) => {
         try {
-            const response = await axios.post("https://mobile-flask-api.onrender.com/predict", {
+            await waitUntilBackendIsReady();
+
+            const response = await axios.post(`${backendUrl}/predict`, {
                 features: featureArray
             });
 
@@ -132,8 +158,26 @@ export default function WalkingScreen({ navigation }) {
             clearInterval(intervalRef.current);
             clearInterval(predictionTimer.current);
             updateActivityTime('walking', durationRef.current);
+
+            // 👇 Bildirim gönder
+            (async () => {
+                try {
+                    const guardianEmail = await AsyncStorage.getItem('guardianEmail');
+                    if (guardianEmail) {
+                        await axios.post('https://mobile-app-backend-1jqt.onrender.com/api/notifications/send-alert', {
+                            email: guardianEmail,
+                            title: "Yürüyüş Tamamlandı",
+                            body: `Kullanıcınız ${durationRef.current} saniye yürüdü.`
+                        });
+                        console.log("📨 Bildirim başarıyla gönderildi.");
+                    }
+                } catch (err) {
+                    console.warn("🚫 Bildirim gönderilirken hata:", err.message);
+                }
+            })();
         };
     }, []);
+
 
     const handleGoBack = () => {
         accelSub.current?.remove();

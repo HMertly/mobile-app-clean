@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.deha.activitytracker",
+      "bundleIdentifier": "com.mert.activitytracker",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -38,7 +38,7 @@
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE"
       ],
-      "package": "com.deha.activitytracker"
+      "package": "com.anonymous.MyProject"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -52,11 +52,11 @@
       ],
       "expo-sqlite"
     ],
-
     "extra": {
       "eas": {
-        "projectId": "00000000-0000-0000-0000-000000000000"
+        "projectId": "58ec6fde-7df7-4d58-a268-f78dc870caa7"
       }
-    }
+    },
+    "owner": "celsusshout"
   }
 }

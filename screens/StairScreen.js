@@ -5,6 +5,26 @@ import { fft } from 'fft-js';
 import axios from 'axios';
 import { ActivityContext } from '../context/ActivityContext';
 
+const backendUrl = "https://mobile-flask-api.onrender.com";
+
+const waitUntilBackendIsReady = async () => {
+    let attempts = 0;
+    const maxAttempts = 10;
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    while (attempts < maxAttempts) {
+        try {
+            const response = await fetch(`${backendUrl}/`);
+            if (response.ok) return;
+        } catch (err) {
+            console.log("⏳ Backend uyanıyor...");
+        }
+        attempts++;
+        await delay(3000);
+    }
+    throw new Error("❌ Backend yanıt vermiyor.");
+};
+
 export default function StairScreen({ navigation }) {
     const [duration, setDuration] = useState(0);
     const [predictedClass, setPredictedClass] = useState(null);
@@ -22,19 +42,13 @@ export default function StairScreen({ navigation }) {
     const SAMPLE_SIZE = 128;
 
     const extractFeatures = (data) => {
-        const channels = [[], [], [], [], [], []]; // ax, ay, az, gx, gy, gz
-
+        const channels = [[], [], [], [], [], []];
         data.forEach(([ax, ay, az, gx, gy, gz]) => {
-            channels[0].push(ax);
-            channels[1].push(ay);
-            channels[2].push(az);
-            channels[3].push(gx);
-            channels[4].push(gy);
-            channels[5].push(gz);
+            channels[0].push(ax); channels[1].push(ay); channels[2].push(az);
+            channels[3].push(gx); channels[4].push(gy); channels[5].push(gz);
         });
 
         const features = [];
-
         const stats = (arr) => {
             const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
             const std = Math.sqrt(arr.map(x => (x - mean) ** 2).reduce((a, b) => a + b, 0) / arr.length);
@@ -43,45 +57,28 @@ export default function StairScreen({ navigation }) {
             return [mean, std, min, max];
         };
 
-        const fftPeak = (arr) => {
-            const phasors = fft(arr);
-            const magnitudes = phasors.map(p => Math.sqrt(p[0] ** 2 + p[1] ** 2));
-            return Math.max(...magnitudes);
-        };
-
-        const fftPower = (arr) => {
-            const phasors = fft(arr);
-            return phasors.map(([re, im]) => re ** 2 + im ** 2).reduce((a, b) => a + b, 0);
-        };
-
+        const fftPeak = (arr) => Math.max(...fft(arr).map(p => Math.sqrt(p[0] ** 2 + p[1] ** 2)));
+        const fftPower = (arr) => fft(arr).map(([re, im]) => re ** 2 + im ** 2).reduce((a, b) => a + b, 0);
         const entropy = (arr) => {
             const total = arr.reduce((a, b) => a + Math.abs(b), 0);
             return -arr.map(x => Math.abs(x) / total).filter(p => p > 0).map(p => p * Math.log2(p)).reduce((a, b) => a + b, 0);
         };
 
         channels.forEach((channel) => {
-            features.push(...stats(channel));
-            features.push(fftPeak(channel));
-            features.push(fftPower(channel));
-            features.push(entropy(channel));
+            features.push(...stats(channel), fftPeak(channel), fftPower(channel), entropy(channel));
         });
 
-        while (features.length < 562) {
-            features.push(0);
-        }
-
+        while (features.length < 562) features.push(0);
         return features.slice(0, 562);
     };
 
     const predictViaAPI = async (featureArray) => {
         try {
-            const response = await axios.post("https://mobile-flask-api.onrender.com/predict", {
-                features: featureArray
-            });
-
+            await waitUntilBackendIsReady();
+            const response = await axios.post(`${backendUrl}/predict`, { features: featureArray });
             const prediction = response.data.prediction;
             setPredictedClass(prediction);
-            isClimbingRef.current = prediction === 5; // 5 = WALKING_UPSTAIRS
+            isClimbingRef.current = prediction === 5;
         } catch (error) {
             console.error("🛑 API tahmin hatası:", error.message);
             Alert.alert("API hatası", "Sunucuya erişilemiyor.");
@@ -107,11 +104,7 @@ export default function StairScreen({ navigation }) {
                 const gyro = gyroData.current[i] || [0, 0, 0];
                 return [...accel, ...gyro];
             });
-
-            if (combined.length === SAMPLE_SIZE) {
-                const features = extractFeatures(combined);
-                predictViaAPI(features);
-            }
+            if (combined.length === SAMPLE_SIZE) predictViaAPI(extractFeatures(combined));
         }, 1000);
 
         intervalRef.current = setInterval(() => {
@@ -124,7 +117,6 @@ export default function StairScreen({ navigation }) {
 
     useEffect(() => {
         startSensors();
-
         return () => {
             accelSub.current?.remove();
             gyroSub.current?.remove();
@@ -134,26 +126,12 @@ export default function StairScreen({ navigation }) {
         };
     }, []);
 
-    const handleGoBack = () => {
-        accelSub.current?.remove();
-        gyroSub.current?.remove();
-        clearInterval(intervalRef.current);
-        clearInterval(predictionTimer.current);
-        navigation.navigate('NewScreen');
-    };
-
-    const formatTime = (seconds) => {
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return `${m} dakika ${s} saniye`;
-    };
-
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Merdiven Çıkma Süresi</Text>
-            <Text style={styles.duration}>{formatTime(duration)}</Text>
+            <Text style={styles.title}>Merdiven Çıkma Süreci</Text>
+            <Text style={styles.duration}>{Math.floor(duration / 60)} dakika {duration % 60} saniye</Text>
             <Text style={styles.prediction}>Tahmin edilen sınıf: {predictedClass !== null ? predictedClass : "..."}</Text>
-            <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
+            <TouchableOpacity onPress={() => navigation.navigate('NewScreen')} style={styles.backButton}>
                 <Text style={styles.backText}>🔙 Geri Dön</Text>
             </TouchableOpacity>
         </View>
@@ -165,12 +143,6 @@ const styles = StyleSheet.create({
     title: { fontSize: 24, fontWeight: 'bold' },
     duration: { fontSize: 20, marginTop: 10 },
     prediction: { fontSize: 16, marginTop: 10, color: 'gray' },
-    backButton: {
-        marginTop: 30,
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        backgroundColor: '#eee',
-        borderRadius: 8,
-    },
+    backButton: { marginTop: 30, paddingVertical: 10, paddingHorizontal: 20, backgroundColor: '#eee', borderRadius: 8 },
     backText: { fontSize: 16, fontWeight: 'bold' }
 });
